@@ -332,6 +332,8 @@
     "qsv_slow_hevc": "Allow Slow HEVC Encoding",
     "qsv_slow_hevc_desc": "This can enable HEVC encoding on older Intel GPUs, at the cost of higher GPU usage and worse performance.",
     "restart_note": "Sunshine is restarting to apply changes.",
+    "set_default_audio": "Set the Audio Sink as default output",
+    "set_default_audio_desc": "When enabled, the selected Audio Sink will be set as default output on the host.",
     "stream_audio": "Stream Audio",
     "stream_audio_desc": "Whether to stream audio or not. Disabling this can be useful for streaming headless displays as second monitors.",
     "sunshine_name": "Sunshine Name",
