@@ -353,6 +353,23 @@ namespace platf::audio {
     return device;
   }
 
+  device_t audio_device(std::wstring device_id, device_enum_t &device_enum) {
+    device_t device;
+    HRESULT status;
+    status = device_enum->GetDevice(
+      device_id.c_str(),
+      &device
+    );
+
+    if (FAILED(status)) {
+      BOOST_LOG(error) << "Couldn't get audio endpoint [0x"sv << util::hex(status).to_string_view() << ']';
+
+      return nullptr;
+    }
+
+    return device;
+  }
+
   class audio_notification_t: public ::IMMNotificationClient {
   public:
     audio_notification_t() {
@@ -447,7 +464,7 @@ namespace platf::audio {
       return capture_e::ok;
     }
 
-    int init(std::uint32_t sample_rate, std::uint32_t frame_size, std::uint32_t channels_out) {
+    int init(std::wstring device_id, std::uint32_t sample_rate, std::uint32_t frame_size, std::uint32_t channels_out) {
       audio_event.reset(CreateEventA(nullptr, FALSE, FALSE, nullptr));
       if (!audio_event) {
         BOOST_LOG(error) << "Couldn't create Event handle"sv;
@@ -478,7 +495,7 @@ namespace platf::audio {
         return -1;
       }
 
-      auto device = default_device(device_enum);
+      auto device = audio_device(device_id, device_enum);
       if (!device) {
         return -1;
       }
@@ -764,7 +781,7 @@ namespace platf::audio {
     std::unique_ptr<mic_t> microphone(const std::uint8_t *mapping, int channels, std::uint32_t sample_rate, std::uint32_t frame_size) override {
       auto mic = std::make_unique<mic_wasapi_t>();
 
-      if (mic->init(sample_rate, frame_size, channels)) {
+      if (mic->init(assigned_device_id, sample_rate, frame_size, channels)) {
         return nullptr;
       }
 
@@ -855,24 +872,26 @@ namespace platf::audio {
       }
 
       int failure {};
-      for (int x = 0; x < (int) ERole_enum_count; ++x) {
-        auto status = policy->SetDefaultEndpoint(device_id->c_str(), (ERole) x);
-        if (status) {
-          // Depending on the format of the string, we could get either of these errors
-          if (status == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || status == E_INVALIDARG) {
-            BOOST_LOG(warning) << "Audio sink not found: "sv << sink;
-          } else {
-            BOOST_LOG(warning) << "Couldn't set ["sv << sink << "] to role ["sv << x << "]: 0x"sv << util::hex(status).to_string_view();
-          }
+      if (config::audio.set_default_audio) {
+        for (int x = 0; x < (int) ERole_enum_count; ++x) {
+          auto status = policy->SetDefaultEndpoint(device_id->c_str(), (ERole) x);
+          if (status) {
+            // Depending on the format of the string, we could get either of these errors
+            if (status == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || status == E_INVALIDARG) {
+              BOOST_LOG(warning) << "Audio sink not found: "sv << sink;
+            } else {
+              BOOST_LOG(warning) << "Couldn't set ["sv << sink << "] to role ["sv << x << "]: 0x"sv << util::hex(status).to_string_view();
+            }
 
-          ++failure;
+            ++failure;
+          }
         }
       }
 
-      // Remember the assigned sink name, so we have it for later if we need to set it
-      // back after another application changes it
+      // Remember the assigned sink name & device id, so we have it for later
       if (!failure) {
         assigned_sink = sink;
+        assigned_device_id = *device_id;
       }
 
       return failure;
@@ -1147,6 +1166,7 @@ namespace platf::audio {
     policy_t policy;
     audio::device_enum_t device_enum;
     std::string assigned_sink;
+    std::wstring assigned_device_id;
   };
 }  // namespace platf::audio
 
@@ -1182,11 +1202,13 @@ namespace platf {
     // Initialize COM
     auto co_init = std::make_unique<platf::audio::co_init_t>();
 
-    // If Steam Streaming Speakers are currently the default audio device,
-    // change the default to something else (if another device is available).
-    audio::audio_control_t audio_ctrl;
-    if (audio_ctrl.init() == 0) {
-      audio_ctrl.reset_default_device();
+    if (config::audio.set_default_audio) {
+      // If Steam Streaming Speakers are currently the default audio device,
+      // change the default to something else (if another device is available).
+      audio::audio_control_t audio_ctrl;
+      if (audio_ctrl.init() == 0) {
+        audio_ctrl.reset_default_device();
+      }
     }
 
     return co_init;
