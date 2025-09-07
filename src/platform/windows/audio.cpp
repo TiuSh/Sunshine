@@ -865,14 +865,14 @@ namespace platf::audio {
       return std::nullopt;
     }
 
-    int set_sink(const std::string &sink) override {
+    int set_sink(const std::string &sink, bool set_default = false) override {
       auto device_id = set_format(sink);
       if (!device_id) {
         return -1;
       }
 
       int failure {};
-      if (config::audio.set_default_audio) {
+      if (set_default && (config::audio.set_default_audio || !config.flags[config_t::HOST_AUDIO]) {
         for (int x = 0; x < (int) ERole_enum_count; ++x) {
           auto status = policy->SetDefaultEndpoint(device_id->c_str(), (ERole) x);
           if (status) {
@@ -1202,7 +1202,7 @@ namespace platf {
     // Initialize COM
     auto co_init = std::make_unique<platf::audio::co_init_t>();
 
-    if (config::audio.set_default_audio) {
+    if (config::audio.set_default_audio || !config.flags[config_t::HOST_AUDIO]) {
       // If Steam Streaming Speakers are currently the default audio device,
       // change the default to something else (if another device is available).
       audio::audio_control_t audio_ctrl;
