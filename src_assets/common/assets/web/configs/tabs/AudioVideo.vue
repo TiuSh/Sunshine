@@ -71,6 +71,14 @@ const config = ref(props.config)
               default="true"
     ></Checkbox>
 
+    <!-- Set default audio -->
+    <Checkbox class="mb-3"
+              id="set_default_audio"
+              locale-prefix="config"
+              v-model="config.set_default_audio"
+              default="true"
+    ></Checkbox>
+
     <AdapterNameSelector
         :platform="platform"
         :config="config"
